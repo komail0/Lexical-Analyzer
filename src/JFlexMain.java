@@ -1,19 +1,13 @@
 import java.io.*;
 import java.util.*;
 
-/**
- * JFlexMain.java
- * Main driver for JFlex scanner (Yylex)
- * Task 2.1 - Part 2
- * Same menu behaviour as ManualScanner
- */
+
 public class JFlexMain {
 
     public static void main(String[] args) {
         Scanner userInput = new Scanner(System.in);
 
-        // Go one directory up into tests/
-        File testsDir = new File(".." + File.separator + "tests");
+        File testsDir = new File("." + File.separator + "tests");
 
         if (!testsDir.exists() || !testsDir.isDirectory()) {
             System.out.println("ERROR: tests folder not found at: "
@@ -22,7 +16,6 @@ public class JFlexMain {
             return;
         }
 
-        // Find all .kw files
         File[] kwFiles = testsDir.listFiles(f -> f.getName().endsWith(".kw"));
 
         if (kwFiles == null || kwFiles.length == 0) {
@@ -32,13 +25,11 @@ public class JFlexMain {
             return;
         }
 
-        // Sort so they appear as test1.kw, test2.kw ...
         Arrays.sort(kwFiles, (a, b) -> a.getName().compareTo(b.getName()));
 
-        // Show menu
-        System.out.println("===========================================");
-        System.out.println("      JFLEX SCANNER - CS4031 Part 2       ");
-        System.out.println("===========================================");
+        System.out.println("=======================");
+        System.out.println("|     JFLEX SCANNER    |");
+        System.out.println("========================");
         System.out.println("Available test files:");
         System.out.println("-------------------------------------------");
         for (int i = 0; i < kwFiles.length; i++) {
@@ -47,7 +38,6 @@ public class JFlexMain {
         System.out.println("-------------------------------------------");
         System.out.print("Enter file number (1-" + kwFiles.length + "): ");
 
-        // Validate choice
         int choice = -1;
         while (choice < 1 || choice > kwFiles.length) {
             try {
@@ -64,13 +54,12 @@ public class JFlexMain {
         System.out.println("===========================================");
 
         try {
-            // Pass file to JFlex-generated Yylex
             FileReader fr    = new FileReader(selectedFile);
             Yylex      lexer = new Yylex(fr);
             Token      token;
             int        count = 0;
 
-            // Print tokens (skip whitespace)
+            // Part A: Print tokens
             System.out.println("\n=== TOKENS ===");
             while ((token = lexer.yylex()) != null) {
                 if (token.getType() != TokenType.WHITESPACE) {
@@ -79,17 +68,21 @@ public class JFlexMain {
                 }
             }
 
-            // Pre-processing summary (Part B)
-            System.out.println("\n=== PRE-PROCESSING (Part B) ===");
+            // Part B: Pre-processing summary
+            System.out.println("\n=== PRE-PROCESSING ===");
             System.out.println("File               : " + selectedFile.getName());
             System.out.println("Total tokens       : " + count);
             System.out.println("Whitespace removed : " + lexer.getWhitespaceRemoved());
 
-            // Symbol table (Part E)
+            // Part E: Symbol table
             lexer.getSymbolTable().display();
 
+            // Part 3: Error handling
+            lexer.getErrorHandler().displayErrors();
+            lexer.getErrorHandler().displaySummary();
+
         } catch (IOException e) {
-            System.err.println("Error reading file: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
         }
 
         userInput.close();
