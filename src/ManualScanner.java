@@ -3,101 +3,103 @@ import java.util.*;
 
 /**
  * ManualScanner - Lexical Analyzer
- * Part A: Token Recognition (25 marks) ✓
- * Part B: Pre-processing (5 marks) ✓
+ * Part A: Token Recognition  (25 marks)
+ * Part B: Pre-processing     ( 5 marks)
+ * Part E: Symbol Table       ( 5 marks)
  */
 public class ManualScanner {
-    private String input;
-    private int position;
-    private int line;
-    private int column;
 
-    // Part B: Track whitespace for statistics
-    private int whitespaceRemoved = 0;
+    private String      input;
+    private int         position;
+    private int         line;
+    private int         column;
+    private int         whitespaceRemoved; // Part B
+    private SymbolTable symbolTable;       // Part E
 
     private static final Set<String> KEYWORDS = new HashSet<>(Arrays.asList(
             "start", "finish", "loop", "condition", "declare", "output",
             "input", "function", "return", "break", "continue", "else"
     ));
 
-    private static final Set<String> BOOLEANS = new HashSet<>(Arrays.asList("true", "false"));
+    private static final Set<String> BOOLEANS = new HashSet<>(Arrays.asList(
+            "true", "false"
+    ));
 
     public ManualScanner(String input) {
-        this.input = input;
-        this.position = 0;
-        this.line = 1;
-        this.column = 1;
+        this.input             = input;
+        this.position          = 0;
+        this.line              = 1;
+        this.column            = 1;
         this.whitespaceRemoved = 0;
+        this.symbolTable       = new SymbolTable();
     }
 
-    /**
-     * Part B: Get whitespace count
-     */
-    public int getWhitespaceRemoved() {
-        return whitespaceRemoved;
+    // Getters for Part B stats and Part E symbol table
+    public int         getWhitespaceRemoved() { return whitespaceRemoved; }
+    public int         getCurrentLine()        { return line;             }
+    public SymbolTable getSymbolTable()        { return symbolTable;      }
+
+    // Scan entire input and return all tokens
+    public List<Token> scanAll() {
+        List<Token> tokens = new ArrayList<>();
+        Token token;
+        while ((token = getNextToken()) != null) {
+            tokens.add(token);
+        }
+        return tokens;
     }
 
-    /**
-     * Part B: Get current line number
-     */
-    public int getCurrentLine() {
-        return line;
-    }
-
-    /**
-     * Part B: Get current column number
-     */
-    public int getCurrentColumn() {
-        return column;
-    }
-
+    // ----------------------------------------------------------------
+    // Core: get next token  (pattern priority per Section 3.12)
+    // ----------------------------------------------------------------
     public Token getNextToken() {
         if (position >= input.length()) return null;
 
-        int startLine = line;
-        int startCol = column;
+        int   startLine = line;
+        int   startCol  = column;
         Token token;
 
-        // Pattern matching priority (Section 3.12)
-        if ((token = tryMultiLineComment(startLine, startCol)) != null) return token;
-        if ((token = trySingleLineComment(startLine, startCol)) != null) return token;
-        if ((token = tryMultiCharOperator(startLine, startCol)) != null) return token;
-        if ((token = tryKeyword(startLine, startCol)) != null) return token;
-        if ((token = tryBoolean(startLine, startCol)) != null) return token;
-        if ((token = tryIdentifier(startLine, startCol)) != null) return token;
-        if ((token = tryFloatingPoint(startLine, startCol)) != null) return token;
-        if ((token = tryInteger(startLine, startCol)) != null) return token;
-        if ((token = tryString(startLine, startCol)) != null) return token;
-        if ((token = tryCharacter(startLine, startCol)) != null) return token;
+        if ((token = tryMultiLineComment(startLine, startCol))   != null) return token;
+        if ((token = trySingleLineComment(startLine, startCol))  != null) return token;
+        if ((token = tryMultiCharOperator(startLine, startCol))  != null) return token;
+        if ((token = tryKeyword(startLine, startCol))            != null) return token;
+        if ((token = tryBoolean(startLine, startCol))            != null) return token;
+        if ((token = tryIdentifier(startLine, startCol))         != null) return token;
+        if ((token = tryFloatingPoint(startLine, startCol))      != null) return token;
+        if ((token = tryInteger(startLine, startCol))            != null) return token;
+        if ((token = tryString(startLine, startCol))             != null) return token;
+        if ((token = tryCharacter(startLine, startCol))          != null) return token;
         if ((token = trySingleCharOperator(startLine, startCol)) != null) return token;
-        if ((token = tryPunctuator(startLine, startCol)) != null) return token;
-        if ((token = tryWhitespace(startLine, startCol)) != null) return token;
+        if ((token = tryPunctuator(startLine, startCol))         != null) return token;
+        if ((token = tryWhitespace(startLine, startCol))         != null) return token;
 
         char ch = peek();
         advance();
         return new Token(TokenType.ERROR, String.valueOf(ch), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Comments
+    // ----------------------------------------------------------------
     private Token tryMultiLineComment(int startLine, int startCol) {
         int startPos = position;
         if (!matchString("#*")) return null;
 
         StringBuilder lexeme = new StringBuilder("#*");
         while (position < input.length()) {
-            if (peek() == '*' && peekAhead(1) == '#') {
+            if (peek() == '*' && peekAt(1) == '#') {
                 lexeme.append("*#");
-                advance();
-                advance();
+                advance(); advance();
                 return new Token(TokenType.MULTI_LINE_COMMENT, lexeme.toString(), startLine, startCol);
             }
             lexeme.append(peek());
             advance();
         }
+        // Unclosed comment
         return new Token(TokenType.ERROR, lexeme.toString(), startLine, startCol);
     }
 
     private Token trySingleLineComment(int startLine, int startCol) {
-        int startPos = position;
         if (!matchString("##")) return null;
 
         StringBuilder lexeme = new StringBuilder("##");
@@ -108,82 +110,92 @@ public class ManualScanner {
         return new Token(TokenType.SINGLE_LINE_COMMENT, lexeme.toString(), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Operators
+    // ----------------------------------------------------------------
     private Token tryMultiCharOperator(int startLine, int startCol) {
         if (position + 1 >= input.length()) return null;
 
-        String twoChar = input.substring(position, position + 2);
+        String    two  = input.substring(position, position + 2);
         TokenType type = null;
 
-        switch (twoChar) {
-            case "**": type = TokenType.ARITHMETIC_OP; break;
-            case "==": case "!=": case "<=": case ">=": type = TokenType.RELATIONAL_OP; break;
-            case "&&": case "||": type = TokenType.LOGICAL_OP; break;
-            case "+=": case "-=": case "*=": case "/=": type = TokenType.ASSIGNMENT_OP; break;
-            case "++": type = TokenType.INCREMENT_OP; break;
-            case "--": type = TokenType.DECREMENT_OP; break;
+        switch (two) {
+            case "**":            type = TokenType.ARITHMETIC_OP; break;
+            case "==": case "!=":
+            case "<=": case ">=": type = TokenType.RELATIONAL_OP; break;
+            case "&&": case "||": type = TokenType.LOGICAL_OP;    break;
+            case "+=": case "-=":
+            case "*=": case "/=": type = TokenType.ASSIGNMENT_OP; break;
+            case "++":            type = TokenType.INCREMENT_OP;  break;
+            case "--":            type = TokenType.DECREMENT_OP;  break;
         }
+        if (type == null) return null;
 
-        if (type != null) {
-            advance();
-            advance();
-            return new Token(type, twoChar, startLine, startCol);
-        }
-        return null;
+        advance(); advance();
+        return new Token(type, two, startLine, startCol);
     }
 
     private Token trySingleCharOperator(int startLine, int startCol) {
-        char ch = peek();
+        char      ch   = peek();
         TokenType type = null;
 
         switch (ch) {
-            case '+': case '-': case '*': case '/': case '%': type = TokenType.ARITHMETIC_OP; break;
-            case '<': case '>': type = TokenType.RELATIONAL_OP; break;
-            case '!': type = TokenType.LOGICAL_OP; break;
-            case '=': type = TokenType.ASSIGNMENT_OP; break;
+            case '+': case '-': case '*': case '/': case '%':
+                type = TokenType.ARITHMETIC_OP; break;
+            case '<': case '>':
+                type = TokenType.RELATIONAL_OP; break;
+            case '!':
+                type = TokenType.LOGICAL_OP;    break;
+            case '=':
+                type = TokenType.ASSIGNMENT_OP; break;
             default: return null;
         }
-
         advance();
         return new Token(type, String.valueOf(ch), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Keywords and Booleans  (must come before identifiers)
+    // ----------------------------------------------------------------
     private Token tryKeyword(int startLine, int startCol) {
-        for (String keyword : KEYWORDS) {
-            if (matchWord(keyword)) {
-                return new Token(TokenType.KEYWORD, keyword, startLine, startCol);
-            }
-        }
+        for (String kw : KEYWORDS)
+            if (matchWord(kw))
+                return new Token(TokenType.KEYWORD, kw, startLine, startCol);
         return null;
     }
 
     private Token tryBoolean(int startLine, int startCol) {
-        for (String bool : BOOLEANS) {
-            if (matchWord(bool)) {
-                return new Token(TokenType.BOOLEAN_LITERAL, bool, startLine, startCol);
-            }
-        }
+        for (String b : BOOLEANS)
+            if (matchWord(b))
+                return new Token(TokenType.BOOLEAN_LITERAL, b, startLine, startCol);
         return null;
     }
 
+    // Match a complete word (not a prefix of a longer identifier)
     private boolean matchWord(String word) {
-        int startPos = position;
+        int saved = position;
         for (int i = 0; i < word.length(); i++) {
             if (position >= input.length() || peek() != word.charAt(i)) {
-                position = startPos;
+                position = saved;
                 return false;
             }
             advance();
         }
+        // Ensure not followed by identifier character
         if (position < input.length()) {
             char next = peek();
             if (Character.isLetterOrDigit(next) || next == '_') {
-                position = startPos;
+                position = saved;
                 return false;
             }
         }
         return true;
     }
 
+    // ----------------------------------------------------------------
+    // Identifier: [A-Z][a-z0-9_]{0,30}
+    // Part E: every identifier is inserted into the symbol table
+    // ----------------------------------------------------------------
     private Token tryIdentifier(int startLine, int startCol) {
         if (position >= input.length() || !Character.isUpperCase(peek())) return null;
 
@@ -196,200 +208,165 @@ public class ManualScanner {
             if (Character.isLowerCase(ch) || Character.isDigit(ch) || ch == '_') {
                 lexeme.append(ch);
                 advance();
-            } else {
-                break;
-            }
+            } else break;
         }
-        return new Token(TokenType.IDENTIFIER, lexeme.toString(), startLine, startCol);
+
+        String name = lexeme.toString();
+        symbolTable.insert(name, startLine, startCol);   // Part E
+        return new Token(TokenType.IDENTIFIER, name, startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Floating-point: [+-]?[0-9]+\.[0-9]{1,6}([eE][+-]?[0-9]+)?
+    // Must be tried BEFORE integer (longest match)
+    // ----------------------------------------------------------------
     private Token tryFloatingPoint(int startLine, int startCol) {
-        int startPos = position;
-        StringBuilder lexeme = new StringBuilder();
+        int           startPos = position;
+        StringBuilder lexeme   = new StringBuilder();
 
+        // Optional sign
         if (position < input.length() && (peek() == '+' || peek() == '-')) {
-            lexeme.append(peek());
-            advance();
+            lexeme.append(peek()); advance();
         }
 
+        // Integer part (required)
         if (position >= input.length() || !Character.isDigit(peek())) {
-            position = startPos;
-            return null;
+            position = startPos; return null;
         }
-
         while (position < input.length() && Character.isDigit(peek())) {
-            lexeme.append(peek());
-            advance();
+            lexeme.append(peek()); advance();
         }
 
+        // Decimal point (required for float)
         if (position >= input.length() || peek() != '.') {
-            position = startPos;
-            return null;
+            position = startPos; return null;
         }
-        lexeme.append('.');
-        advance();
+        lexeme.append('.'); advance();
 
-        int fracDigits = 0;
-        while (position < input.length() && Character.isDigit(peek()) && fracDigits < 6) {
-            lexeme.append(peek());
-            advance();
-            fracDigits++;
+        // Fractional digits (1-6 required)
+        int frac = 0;
+        while (position < input.length() && Character.isDigit(peek()) && frac < 6) {
+            lexeme.append(peek()); advance(); frac++;
         }
+        if (frac == 0 || frac > 6) { position = startPos; return null; }
 
-        if (fracDigits == 0 || fracDigits > 6) {
-            position = startPos;
-            return null;
-        }
-
+        // Optional exponent
         if (position < input.length() && (peek() == 'e' || peek() == 'E')) {
             int expStart = position;
-            lexeme.append(peek());
-            advance();
-
+            lexeme.append(peek()); advance();
             if (position < input.length() && (peek() == '+' || peek() == '-')) {
-                lexeme.append(peek());
-                advance();
+                lexeme.append(peek()); advance();
             }
-
             int expDigits = 0;
             while (position < input.length() && Character.isDigit(peek())) {
-                lexeme.append(peek());
-                advance();
-                expDigits++;
+                lexeme.append(peek()); advance(); expDigits++;
             }
-
             if (expDigits == 0) {
                 position = expStart;
-                lexeme.setLength(lexeme.length() - (position - expStart));
+                lexeme.setLength(expStart - startPos);
             }
         }
 
         return new Token(TokenType.FLOATING_POINT_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Integer: [+-]?[0-9]+
+    // ----------------------------------------------------------------
     private Token tryInteger(int startLine, int startCol) {
-        int startPos = position;
-        StringBuilder lexeme = new StringBuilder();
+        int           startPos = position;
+        StringBuilder lexeme   = new StringBuilder();
 
+        // Optional sign
         if (position < input.length() && (peek() == '+' || peek() == '-')) {
-            lexeme.append(peek());
-            advance();
+            lexeme.append(peek()); advance();
         }
 
+        // Digits (required)
         if (position >= input.length() || !Character.isDigit(peek())) {
-            position = startPos;
-            return null;
+            position = startPos; return null;
         }
-
         while (position < input.length() && Character.isDigit(peek())) {
-            lexeme.append(peek());
-            advance();
+            lexeme.append(peek()); advance();
         }
 
+        // If followed by '.', this is actually a float
         if (position < input.length() && peek() == '.') {
-            position = startPos;
-            return null;
+            position = startPos; return null;
         }
 
         return new Token(TokenType.INTEGER_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
-    /**
-     * String literal matching
-     * Part B: Preserves whitespace INSIDE string literals
-     * Example: "Hello  World" keeps the double space
-     */
+    // ----------------------------------------------------------------
+    // String literal: "([ ^"\\\n]|\\["\\ntr])*"
+    // Part B: whitespace INSIDE strings is preserved
+    // ----------------------------------------------------------------
     private Token tryString(int startLine, int startCol) {
         int startPos = position;
         if (peek() != '"') return null;
 
         StringBuilder lexeme = new StringBuilder();
-        lexeme.append('"');
-        advance();
+        lexeme.append('"'); advance();
 
         while (position < input.length()) {
             char ch = peek();
             if (ch == '"') {
-                lexeme.append('"');
-                advance();
+                lexeme.append('"'); advance();
                 return new Token(TokenType.STRING_LITERAL, lexeme.toString(), startLine, startCol);
             }
-            if (ch == '\n') {
-                position = startPos;
-                return null;
-            }
+            if (ch == '\n') { position = startPos; return null; }
             if (ch == '\\') {
-                lexeme.append(ch);
-                advance();
+                lexeme.append(ch); advance();
                 if (position < input.length()) {
-                    char escaped = peek();
-                    if (escaped == '"' || escaped == '\\' || escaped == 'n' ||
-                            escaped == 't' || escaped == 'r') {
-                        lexeme.append(escaped);
-                        advance();
-                    } else {
-                        position = startPos;
-                        return null;
-                    }
+                    char esc = peek();
+                    if (esc == '"' || esc == '\\' || esc == 'n' || esc == 't' || esc == 'r') {
+                        lexeme.append(esc); advance();
+                    } else { position = startPos; return null; }
                 }
             } else {
-                // Part B: Preserve ALL characters including whitespace
-                lexeme.append(ch);
-                advance();
+                // Part B: all chars including spaces preserved inside string
+                lexeme.append(ch); advance();
             }
         }
-        position = startPos;
-        return null;
+        position = startPos; return null;
     }
 
+    // ----------------------------------------------------------------
+    // Character literal: '([ ^'\\\n]|\\['\\ntr])'
+    // ----------------------------------------------------------------
     private Token tryCharacter(int startLine, int startCol) {
         int startPos = position;
         if (peek() != '\'') return null;
 
         StringBuilder lexeme = new StringBuilder();
-        lexeme.append('\'');
-        advance();
+        lexeme.append('\''); advance();
 
-        if (position >= input.length()) {
-            position = startPos;
-            return null;
-        }
+        if (position >= input.length()) { position = startPos; return null; }
 
         char ch = peek();
-        if (ch == '\n' || ch == '\'') {
-            position = startPos;
-            return null;
-        }
+        if (ch == '\n' || ch == '\'') { position = startPos; return null; }
 
         if (ch == '\\') {
-            lexeme.append(ch);
-            advance();
+            lexeme.append(ch); advance();
             if (position < input.length()) {
-                char escaped = peek();
-                if (escaped == '\'' || escaped == '\\' || escaped == 'n' ||
-                        escaped == 't' || escaped == 'r') {
-                    lexeme.append(escaped);
-                    advance();
-                } else {
-                    position = startPos;
-                    return null;
-                }
+                char esc = peek();
+                if (esc == '\'' || esc == '\\' || esc == 'n' || esc == 't' || esc == 'r') {
+                    lexeme.append(esc); advance();
+                } else { position = startPos; return null; }
             }
         } else {
-            lexeme.append(ch);
-            advance();
+            lexeme.append(ch); advance();
         }
 
-        if (position >= input.length() || peek() != '\'') {
-            position = startPos;
-            return null;
-        }
-
-        lexeme.append('\'');
-        advance();
+        if (position >= input.length() || peek() != '\'') { position = startPos; return null; }
+        lexeme.append('\''); advance();
         return new Token(TokenType.CHARACTER_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Punctuators: ( ) { } [ ] , ; :
+    // ----------------------------------------------------------------
     private Token tryPunctuator(int startLine, int startCol) {
         char ch = peek();
         if (ch == '(' || ch == ')' || ch == '{' || ch == '}' ||
@@ -400,60 +377,47 @@ public class ManualScanner {
         return null;
     }
 
-    /**
-     * Part B: Whitespace handling
-     * - Removes unnecessary whitespace (creates token but filters in processing)
-     * - Preserves whitespace in string literals (handled in tryString)
-     * - Tracks line numbers accurately (advance() updates line/column)
-     */
+    // ----------------------------------------------------------------
+    // Whitespace: [ \t\r\n]+
+    // Part B: removed from output, count tracked, line/col updated
+    // ----------------------------------------------------------------
     private Token tryWhitespace(int startLine, int startCol) {
         if (position >= input.length()) return null;
-
         char ch = peek();
         if (ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n') return null;
 
         StringBuilder lexeme = new StringBuilder();
-        int whitespaceCount = 0;
-
         while (position < input.length()) {
             ch = peek();
             if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') {
                 lexeme.append(ch);
-                whitespaceCount++;
-                advance();  // Part B: Accurately tracks line/column
-            } else {
-                break;
-            }
+                whitespaceRemoved++;   // Part B: count removed whitespace
+                advance();             // Part B: advance updates line/column
+            } else break;
         }
-
-        // Part B: Count whitespace removed
-        whitespaceRemoved += whitespaceCount;
-
         return new Token(TokenType.WHITESPACE, lexeme.toString(), startLine, startCol);
     }
 
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
     private char peek() {
-        return (position >= input.length()) ? '\0' : input.charAt(position);
+        return position >= input.length() ? '\0' : input.charAt(position);
     }
 
-    private char peekAhead(int offset) {
+    private char peekAt(int offset) {
         int pos = position + offset;
-        return (pos >= input.length()) ? '\0' : input.charAt(pos);
+        return pos >= input.length() ? '\0' : input.charAt(pos);
     }
 
-    /**
-     * Part B: Accurately tracks line and column numbers
-     * - Increments line on '\n'
-     * - Resets column to 1 on new line
-     * - Increments column for other characters
-     */
+    // Part B: advance tracks line and column numbers accurately
     private void advance() {
         if (position < input.length()) {
             if (input.charAt(position) == '\n') {
-                line++;      // Part B: Track line numbers
-                column = 1;  // Part B: Reset column on new line
+                line++;
+                column = 1;
             } else {
-                column++;    // Part B: Track column numbers
+                column++;
             }
             position++;
         }
@@ -461,46 +425,45 @@ public class ManualScanner {
 
     private boolean matchString(String str) {
         if (position + str.length() > input.length()) return false;
-
-        for (int i = 0; i < str.length(); i++) {
+        for (int i = 0; i < str.length(); i++)
             if (input.charAt(position + i) != str.charAt(i)) return false;
-        }
-
-        for (int i = 0; i < str.length(); i++) {
-            advance();
-        }
+        for (int i = 0; i < str.length(); i++) advance();
         return true;
     }
 
+    // ----------------------------------------------------------------
+    // Main
+    // ----------------------------------------------------------------
     public static void main(String[] args) {
         if (args.length < 1) {
             System.out.println("Usage: java ManualScanner <input_file>");
             return;
         }
-
         try {
             String input = new String(java.nio.file.Files.readAllBytes(
                     java.nio.file.Paths.get(args[0])));
 
             ManualScanner scanner = new ManualScanner(input);
-            Token token;
-            int tokenCount = 0;
+            List<Token>   tokens  = scanner.scanAll();
 
+            // Part A: Print all tokens
             System.out.println("=== TOKENS ===");
-            while ((token = scanner.getNextToken()) != null) {
-                // Part B: Remove unnecessary whitespace from output
+            int tokenCount = 0;
+            for (Token token : tokens) {
                 if (token.getType() != TokenType.WHITESPACE) {
                     System.out.println(token);
                     tokenCount++;
                 }
             }
 
-            // Part B: Display pre-processing information
-            System.out.println("\n=== PRE-PROCESSING INFO (Part B) ===");
-            System.out.println("Total tokens (excluding whitespace): " + tokenCount);
-            System.out.println("Whitespace characters removed: " + scanner.getWhitespaceRemoved());
-            System.out.println("Lines processed: " + scanner.getCurrentLine());
-            System.out.println("Note: Whitespace preserved in string literals");
+            // Part B: Pre-processing summary
+            System.out.println("\n=== PRE-PROCESSING (Part B) ===");
+            System.out.println("Total tokens       : " + tokenCount);
+            System.out.println("Whitespace removed : " + scanner.getWhitespaceRemoved());
+            System.out.println("Lines processed    : " + scanner.getCurrentLine());
+
+            // Part E: Symbol table
+            scanner.getSymbolTable().display();
 
         } catch (IOException e) {
             System.err.println("Error: " + e.getMessage());
