@@ -1,19 +1,14 @@
 import java.io.*;
 import java.util.*;
 
-/**
- * JFlexMain.java
- * Main driver for JFlex scanner (Yylex)
- * Task 2.1 - Part 2
- * Same menu behaviour as ManualScanner
- */
+
 public class JFlexMain {
 
     public static void main(String[] args) {
         Scanner userInput = new Scanner(System.in);
 
         // Go one directory up into tests/
-        File testsDir = new File(".." + File.separator + "tests");
+        File testsDir = new File("." + File.separator + "tests");
 
         if (!testsDir.exists() || !testsDir.isDirectory()) {
             System.out.println("ERROR: tests folder not found at: "
@@ -36,9 +31,9 @@ public class JFlexMain {
         Arrays.sort(kwFiles, (a, b) -> a.getName().compareTo(b.getName()));
 
         // Show menu
-        System.out.println("===========================================");
-        System.out.println("      JFLEX SCANNER - CS4031 Part 2       ");
-        System.out.println("===========================================");
+        System.out.println("==========================");
+        System.out.println("|      JFLEX SCANNER      |");
+        System.out.println("===========================");
         System.out.println("Available test files:");
         System.out.println("-------------------------------------------");
         for (int i = 0; i < kwFiles.length; i++) {
