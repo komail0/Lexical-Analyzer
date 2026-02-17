@@ -434,20 +434,73 @@ public class ManualScanner {
     // ----------------------------------------------------------------
     // Main
     // ----------------------------------------------------------------
+    // ----------------------------------------------------------------
+    // Main
+    // ----------------------------------------------------------------
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage: java ManualScanner <input_file>");
+        Scanner userInput = new Scanner(System.in);
+
+        // Go one directory up, then into the tests folder
+        String testsPath = "." + File.separator + "tests";
+        File   testsDir  = new File(testsPath);
+
+        // Check the tests folder exists
+        if (!testsDir.exists() || !testsDir.isDirectory()) {
+            System.out.println("ERROR: tests folder not found at: " + testsDir.getAbsolutePath());
+            userInput.close();
             return;
         }
+
+        // Find all .kw files in the tests folder
+        File[] kwFiles = testsDir.listFiles(f -> f.getName().endsWith(".kw"));
+
+        if (kwFiles == null || kwFiles.length == 0) {
+            System.out.println("ERROR: No .kw files found in: " + testsDir.getAbsolutePath());
+            userInput.close();
+            return;
+        }
+
+        // Sort files by name so they appear in order (test1.kw, test2.kw ...)
+        Arrays.sort(kwFiles, (a, b) -> a.getName().compareTo(b.getName()));
+
+        // Show menu to user
+        System.out.println("===========================================");
+        System.out.println("         MANUAL SCANNER                    ");
+        System.out.println("===========================================");
+        System.out.println("Available test files:");
+        System.out.println("-------------------------------------------");
+        for (int i = 0; i < kwFiles.length; i++) {
+            System.out.printf("  [%d] %s%n", i + 1, kwFiles[i].getName());
+        }
+        System.out.println("-------------------------------------------");
+        System.out.print("Enter file number (1-" + kwFiles.length + "): ");
+
+        // Read and validate user choice
+        int choice = -1;
+        while (choice < 1 || choice > kwFiles.length) {
+            try {
+                choice = Integer.parseInt(userInput.nextLine().trim());
+                if (choice < 1 || choice > kwFiles.length) {
+                    System.out.print("Invalid choice. Enter a number (1-" + kwFiles.length + "): ");
+                }
+            } catch (NumberFormatException e) {
+                System.out.print("Invalid input. Enter a number (1-" + kwFiles.length + "): ");
+            }
+        }
+
+        // Read selected file
+        File selectedFile = kwFiles[choice - 1];
+        System.out.println("\nReading: " + selectedFile.getName());
+        System.out.println("===========================================");
+
         try {
-            String input = new String(java.nio.file.Files.readAllBytes(
-                    java.nio.file.Paths.get(args[0])));
+            String input = new String(java.nio.file.Files.readAllBytes(selectedFile.toPath()));
 
             ManualScanner scanner = new ManualScanner(input);
             List<Token>   tokens  = scanner.scanAll();
 
             // Part A: Print all tokens
-            System.out.println("=== TOKENS ===");
+            System.out.println("\n=== TOKENS ===");
             int tokenCount = 0;
             for (Token token : tokens) {
                 if (token.getType() != TokenType.WHITESPACE) {
@@ -458,6 +511,7 @@ public class ManualScanner {
 
             // Part B: Pre-processing summary
             System.out.println("\n=== PRE-PROCESSING (Part B) ===");
+            System.out.println("File               : " + selectedFile.getName());
             System.out.println("Total tokens       : " + tokenCount);
             System.out.println("Whitespace removed : " + scanner.getWhitespaceRemoved());
             System.out.println("Lines processed    : " + scanner.getCurrentLine());
@@ -466,7 +520,9 @@ public class ManualScanner {
             scanner.getSymbolTable().display();
 
         } catch (IOException e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("Error reading file: " + e.getMessage());
         }
+
+        userInput.close();
     }
 }
