@@ -1,0 +1,23 @@
+start
+    declare Count = 42
+
+    declare 2invalid = 10
+
+    declare _wrong = 5
+
+    declare count = 1
+
+    declare Bad_float = 3.1234567
+
+    declare Unterminated = "Hello World
+
+    declare Bad_char = 'AB'
+
+    declare Valid = 99
+    @ = 5
+    $ = 10
+
+    declare Good = 3.14
+    output Count
+    output Good
+finish

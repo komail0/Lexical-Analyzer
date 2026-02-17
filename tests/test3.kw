@@ -1,0 +1,25 @@
+start
+    declare Str1 = "Hello World"
+    declare Str2 = "Say \"Hello\" to everyone"
+    declare Str3 = "Line1\nLine2"
+    declare Str4 = "Col1\tCol2\tCol3"
+    declare Str5 = "Back\\slash"
+    declare Str6 = "Return\rEnd"
+    declare Str7 = "Mix: \"quoted\"\tnewline\nend"
+
+    declare Ch1 = 'A'
+    declare Ch2 = 'z'
+    declare Ch3 = '9'
+    declare Ch4 = '\''
+    declare Ch5 = '\\'
+    declare Ch6 = '\n'
+    declare Ch7 = '\t'
+    declare Ch8 = '\r'
+
+    output Str1
+    output Str2
+    output Str3
+    output Ch1
+    output Ch4
+    output Ch5
+finish

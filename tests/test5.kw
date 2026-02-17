@@ -1,0 +1,34 @@
+## This is a single-line comment
+## Another single-line comment
+
+#*
+   This is a multi-line comment
+   spanning multiple lines
+*#
+
+start
+    ## Declare variables
+    declare Count = 10  ## inline comment after code
+    declare Sum = 0     ## another inline comment
+
+    #* This loop adds numbers
+       from Count down to 0 *#
+    loop Count > 0
+        Sum = Sum + Count  ## add Count to Sum
+        Count--            ## decrement Count
+
+    #*
+       Comments can contain anything:
+       declare X = 999
+       loop true
+           output "this is ignored"
+       start finish loop condition
+    *#
+
+    output Sum  ## print the result
+
+    ## Keywords inside comments are ignored:
+    ## start finish loop declare output input
+    ## function return break continue else condition
+
+finish  ## end of program

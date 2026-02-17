@@ -1,0 +1,18 @@
+start
+    declare Count = 42
+    declare Sum = 0
+    declare Pi = 3.14159
+    declare Name = "Alice"
+    declare Initial = 'A'
+    declare Is_valid = true
+    declare Not_valid = false
+
+    loop Count > 0
+        Sum = Sum + Count
+        Count--
+
+    output Sum
+    output Pi
+    output Name
+    output Is_valid
+finish

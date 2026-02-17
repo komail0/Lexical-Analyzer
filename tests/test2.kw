@@ -1,0 +1,50 @@
+start
+    declare X = 10
+    declare Y = 20
+    declare Z = 0
+    declare Result = 0
+
+    Result = X + Y * 2
+    Result = (X + Y) * 2
+    Result = X ** 2
+    Result = Y % 3
+
+    X += 5
+    Y -= 3
+    Z *= 2
+    X /= 4
+
+    X++
+    Y--
+    ++X
+    --Y
+
+    condition X == Y
+        output "Equal"
+
+    condition X != Y
+        output "Not equal"
+
+    condition X > 0 && Y < 100
+        output "In range"
+
+    condition X == 0 || Y == 0
+        output "One is zero"
+
+    condition !Is_valid
+        output "Invalid"
+
+    loop X > 0 && X < 50
+        X = X - 1
+        condition X == 25
+            break
+        condition X == 30
+            continue
+
+    function Calculate
+        declare Temp = X + Y
+        return Temp
+
+    input Z
+    output Z
+finish
