@@ -7,6 +7,7 @@ public class JFlexMain {
     public static void main(String[] args) {
         Scanner userInput = new Scanner(System.in);
 
+        // Go one directory up into tests/
         File testsDir = new File("." + File.separator + "tests");
 
         if (!testsDir.exists() || !testsDir.isDirectory()) {
@@ -16,6 +17,7 @@ public class JFlexMain {
             return;
         }
 
+        // Find all .kw files
         File[] kwFiles = testsDir.listFiles(f -> f.getName().endsWith(".kw"));
 
         if (kwFiles == null || kwFiles.length == 0) {
@@ -25,11 +27,13 @@ public class JFlexMain {
             return;
         }
 
+        // Sort so they appear as test1.kw, test2.kw ...
         Arrays.sort(kwFiles, (a, b) -> a.getName().compareTo(b.getName()));
 
-        System.out.println("=======================");
-        System.out.println("|     JFLEX SCANNER    |");
-        System.out.println("========================");
+        // Show menu
+        System.out.println("==========================");
+        System.out.println("|      JFLEX SCANNER      |");
+        System.out.println("===========================");
         System.out.println("Available test files:");
         System.out.println("-------------------------------------------");
         for (int i = 0; i < kwFiles.length; i++) {
@@ -38,6 +42,7 @@ public class JFlexMain {
         System.out.println("-------------------------------------------");
         System.out.print("Enter file number (1-" + kwFiles.length + "): ");
 
+        // Validate choice
         int choice = -1;
         while (choice < 1 || choice > kwFiles.length) {
             try {
@@ -54,12 +59,13 @@ public class JFlexMain {
         System.out.println("===========================================");
 
         try {
+            // Pass file to JFlex-generated Yylex
             FileReader fr    = new FileReader(selectedFile);
             Yylex      lexer = new Yylex(fr);
             Token      token;
             int        count = 0;
 
-            // Part A: Print tokens
+            // Print tokens (skip whitespace)
             System.out.println("\n=== TOKENS ===");
             while ((token = lexer.yylex()) != null) {
                 if (token.getType() != TokenType.WHITESPACE) {
@@ -68,21 +74,17 @@ public class JFlexMain {
                 }
             }
 
-            // Part B: Pre-processing summary
-            System.out.println("\n=== PRE-PROCESSING ===");
+            // Pre-processing summary (Part B)
+            System.out.println("\n=== PRE-PROCESSING (Part B) ===");
             System.out.println("File               : " + selectedFile.getName());
             System.out.println("Total tokens       : " + count);
             System.out.println("Whitespace removed : " + lexer.getWhitespaceRemoved());
 
-            // Part E: Symbol table
+            // Symbol table (Part E)
             lexer.getSymbolTable().display();
 
-            // Part 3: Error handling
-            lexer.getErrorHandler().displayErrors();
-            lexer.getErrorHandler().displaySummary();
-
         } catch (IOException e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("Error reading file: " + e.getMessage());
         }
 
         userInput.close();
