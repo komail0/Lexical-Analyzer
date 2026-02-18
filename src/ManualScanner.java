@@ -40,7 +40,7 @@ public class ManualScanner {
         return tokens;
     }
 
-    // ── Core ──────────────────────────────────────────────────────────────────
+
     public Token getNextToken() {
         if (position >= input.length()) return null;
 
@@ -62,7 +62,7 @@ public class ManualScanner {
         if ((token = tryPunctuator(startLine, startCol))         != null) return token;
         if ((token = tryWhitespace(startLine, startCol))         != null) return token;
 
-        // ── Error Recovery (Part 3): invalid character ──────────────────────
+
         // Report the error, skip one character, and CONTINUE scanning.
         char ch = peek();
         advance();
@@ -70,7 +70,7 @@ public class ManualScanner {
         return new Token(TokenType.ERROR, String.valueOf(ch), startLine, startCol);
     }
 
-    // ── Comments ──────────────────────────────────────────────────────────────
+    // ── Comments
     private Token tryMultiLineComment(int startLine, int startCol) {
         if (!matchString("#*")) return null;
 
@@ -84,9 +84,8 @@ public class ManualScanner {
             lexeme.append(peek());
             advance();
         }
-        // ── Error: unclosed comment (Part 3) ────────────────────────────────
-        // Recovery: treat entire remainder as comment body, return error token,
-        //           scanner reaches EOF and stops — all errors already reported.
+
+
         errorHandler.detectUnclosedComment(lexeme.toString(), startLine, startCol);
         return new Token(TokenType.ERROR, lexeme.toString(), startLine, startCol);
     }
@@ -98,7 +97,7 @@ public class ManualScanner {
         return new Token(TokenType.SINGLE_LINE_COMMENT, lexeme.toString(), startLine, startCol);
     }
 
-    // ── Operators ─────────────────────────────────────────────────────────────
+    // ── Operators
     private Token tryMultiCharOperator(int startLine, int startCol) {
         if (position + 1 >= input.length()) return null;
         String two = input.substring(position, position + 2);
@@ -132,7 +131,7 @@ public class ManualScanner {
         return new Token(type, String.valueOf(ch), startLine, startCol);
     }
 
-    // ── Keywords & Booleans ───────────────────────────────────────────────────
+    // ── Keywords & Booleans
     private Token tryKeyword(int startLine, int startCol) {
         for (String kw : KEYWORDS) if (matchWord(kw)) return new Token(TokenType.KEYWORD, kw, startLine, startCol);
         return null;
@@ -154,14 +153,12 @@ public class ManualScanner {
         return true;
     }
 
-    // ── Identifier ────────────────────────────────────────────────────────────
+    // ── Identifier
     private Token tryIdentifier(int startLine, int startCol) {
         if (position >= input.length()) return null;
         char first = peek();
 
-        // ── Error: invalid identifier start (Part 3) ─────────────────────────
-        // A word starting with lowercase, digit, or underscore is invalid.
-        // Recovery: consume the whole word-like sequence, report once, return ERROR.
+
         if (Character.isLowerCase(first) || first == '_') {
             StringBuilder bad = new StringBuilder();
             bad.append(first); advance();
@@ -186,8 +183,7 @@ public class ManualScanner {
             } else break;
         }
 
-        // ── Error: identifier too long (Part 3) ──────────────────────────────
-        // Recovery: truncate to 31 chars, report error, continue with truncated name.
+
         if (lexeme.length() > 31) {
             errorHandler.detectIdentifierTooLong(lexeme.toString(), startLine, startCol);
             lexeme.setLength(31);
@@ -198,15 +194,16 @@ public class ManualScanner {
         return new Token(TokenType.IDENTIFIER, name, startLine, startCol);
     }
 
-    // ── Floating-point ────────────────────────────────────────────────────────
+    // ── Floating-point
     private Token tryFloatingPoint(int startLine, int startCol) {
         int startPos = position;
+        int savedLine = line, savedCol = column;
         StringBuilder lexeme = new StringBuilder();
 
         if (position < input.length() && (peek() == '+' || peek() == '-')) { lexeme.append(peek()); advance(); }
-        if (position >= input.length() || !Character.isDigit(peek())) { position = startPos; return null; }
+        if (position >= input.length() || !Character.isDigit(peek())) { position = startPos; line = savedLine; column = savedCol; return null; }
         while (position < input.length() && Character.isDigit(peek())) { lexeme.append(peek()); advance(); }
-        if (position >= input.length() || peek() != '.') { position = startPos; return null; }
+        if (position >= input.length() || peek() != '.') { position = startPos; line = savedLine; column = savedCol; return null; }
 
         lexeme.append('.'); advance();
 
@@ -214,19 +211,13 @@ public class ManualScanner {
         StringBuilder fracDigits = new StringBuilder();
         while (position < input.length() && Character.isDigit(peek())) { fracDigits.append(peek()); advance(); }
 
-        if (fracDigits.length() == 0) { position = startPos; return null; }
+        if (fracDigits.length() == 0) { position = startPos; line = savedLine; column = savedCol; return null; }
 
-        // ── Error: too many fractional digits (Part 3) ───────────────────────
-        // Recovery: accept the first 6 digits as valid float, leave the rest
-        //           to be scanned as a new integer token in the next call.
+
         if (fracDigits.length() > 6) {
             String validPart = lexeme.toString() + fracDigits.substring(0, 6);
             errorHandler.detectMalformedFloat(
                     lexeme.toString() + fracDigits.toString(), startLine, startCol);
-            // Backtrack: put extra digits back
-            int extra = fracDigits.length() - 6;
-            position -= extra;
-            column   -= extra;
             return new Token(TokenType.FLOATING_POINT_LITERAL, validPart, startLine, startCol);
         }
 
@@ -245,18 +236,19 @@ public class ManualScanner {
         return new Token(TokenType.FLOATING_POINT_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
-    // ── Integer ───────────────────────────────────────────────────────────────
+    // ── Integer
     private Token tryInteger(int startLine, int startCol) {
         int startPos = position;
+        int savedLine = line, savedCol = column;
         StringBuilder lexeme = new StringBuilder();
         if (position < input.length() && (peek() == '+' || peek() == '-')) { lexeme.append(peek()); advance(); }
-        if (position >= input.length() || !Character.isDigit(peek())) { position = startPos; return null; }
+        if (position >= input.length() || !Character.isDigit(peek())) { position = startPos; line = savedLine; column = savedCol; return null; }
         while (position < input.length() && Character.isDigit(peek())) { lexeme.append(peek()); advance(); }
-        if (position < input.length() && peek() == '.') { position = startPos; return null; }
+        if (position < input.length() && peek() == '.') { position = startPos; line = savedLine; column = savedCol; return null; }
         return new Token(TokenType.INTEGER_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
-    // ── String literal ────────────────────────────────────────────────────────
+    // ── String literal
     private Token tryString(int startLine, int startCol) {
         int startPos = position;
         if (peek() != '"') return null;
@@ -268,10 +260,9 @@ public class ManualScanner {
             char ch = peek();
             if (ch == '"')  { lexeme.append('"'); advance(); return new Token(TokenType.STRING_LITERAL, lexeme.toString(), startLine, startCol); }
 
-            // ── Error: unterminated string (Part 3) ──────────────────────────
-            // Recovery: stop at newline, report error, return ERROR token.
-            //           Scanner continues from NEXT line.
+
             if (ch == '\n') {
+                lexeme.append(ch); advance();  // consume \n same as JFlex
                 errorHandler.detectUnterminatedString(lexeme.toString(), startLine, startCol);
                 return new Token(TokenType.ERROR, lexeme.toString(), startLine, startCol);
             }
@@ -295,7 +286,7 @@ public class ManualScanner {
         return new Token(TokenType.ERROR, lexeme.toString(), startLine, startCol);
     }
 
-    // ── Character literal ─────────────────────────────────────────────────────
+    // ── Character literal
     private Token tryCharacter(int startLine, int startCol) {
         int startPos = position;
         if (peek() != '\'') return null;
@@ -310,7 +301,7 @@ public class ManualScanner {
 
         char ch = peek();
 
-        // ── Error: empty char literal or newline (Part 3) ────────────────────
+
         if (ch == '\n' || ch == '\'') {
             errorHandler.detectUnterminatedChar(lexeme.toString(), startLine, startCol);
             if (ch == '\'') advance(); // consume closing quote
@@ -331,12 +322,11 @@ public class ManualScanner {
         } else { lexeme.append(ch); advance(); }
 
         if (position >= input.length() || peek() != '\'') {
-            // ── Error: multi-char literal or missing closing quote (Part 3) ──
-            // Recovery: consume until closing quote or whitespace, report, continue.
+
             while (position < input.length() && peek() != '\'' && peek() != '\n') {
                 lexeme.append(peek()); advance();
             }
-            if (position < input.length() && peek() == '\'') advance();
+            if (position < input.length() && peek() == '\'') { lexeme.append('\''); advance(); }
             errorHandler.detectUnterminatedChar(lexeme.toString(), startLine, startCol);
             return new Token(TokenType.ERROR, lexeme.toString(), startLine, startCol);
         }
@@ -345,7 +335,7 @@ public class ManualScanner {
         return new Token(TokenType.CHARACTER_LITERAL, lexeme.toString(), startLine, startCol);
     }
 
-    // ── Punctuators ───────────────────────────────────────────────────────────
+    // ── Punctuators
     private Token tryPunctuator(int startLine, int startCol) {
         char ch = peek();
         if (ch=='('||ch==')'||ch=='{'||ch=='}'||ch=='['||ch==']'||ch==','||ch==';'||ch==':') {
@@ -354,7 +344,7 @@ public class ManualScanner {
         return null;
     }
 
-    // ── Whitespace ────────────────────────────────────────────────────────────
+    // ── Whitespace
     private Token tryWhitespace(int startLine, int startCol) {
         if (position >= input.length()) return null;
         char ch = peek();
@@ -368,7 +358,7 @@ public class ManualScanner {
         return new Token(TokenType.WHITESPACE, lexeme.toString(), startLine, startCol);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers
     private char peek()              { return position >= input.length() ? '\0' : input.charAt(position); }
     private char peekAt(int offset)  { int p = position+offset; return p >= input.length() ? '\0' : input.charAt(p); }
 
@@ -386,7 +376,7 @@ public class ManualScanner {
         return true;
     }
 
-    // ── Main ──────────────────────────────────────────────────────────────────
+    // ── Main
     public static void main(String[] args) {
         Scanner userInput = new Scanner(System.in);
 
@@ -409,55 +399,69 @@ public class ManualScanner {
         System.out.println("-------------------------------------------");
         for (int i = 0; i < kwFiles.length; i++) System.out.printf("  [%d] %s%n", i+1, kwFiles[i].getName());
         System.out.println("-------------------------------------------");
-        System.out.print("Enter file number (1-" + kwFiles.length + "): ");
+        while (true) {
 
-        int choice = -1;
-        while (choice < 1 || choice > kwFiles.length) {
+            System.out.print("\nEnter file number (1-" + kwFiles.length + ") or 0 to exit: ");
+
+            int choice = -1;
+
             try {
                 choice = Integer.parseInt(userInput.nextLine().trim());
-                if (choice < 1 || choice > kwFiles.length)
-                    System.out.print("Invalid. Enter (1-" + kwFiles.length + "): ");
-            } catch (NumberFormatException e) {
-                System.out.print("Invalid. Enter (1-" + kwFiles.length + "): ");
-            }
-        }
 
-        File selectedFile = kwFiles[choice - 1];
-        System.out.println("\nReading: " + selectedFile.getName());
-        System.out.println("===========================================");
-
-        try {
-            String input = new String(java.nio.file.Files.readAllBytes(selectedFile.toPath()));
-            ManualScanner scanner = new ManualScanner(input);
-            List<Token>   tokens  = scanner.scanAll();
-
-            // Part A
-            System.out.println("\n=== TOKENS ===");
-            int tokenCount = 0;
-            for (Token token : tokens) {
-                if (token.getType() != TokenType.WHITESPACE) {
-                    System.out.println(token);
-                    tokenCount++;
+                if (choice == 0) {
+                    System.out.println("Exiting program...");
+                    break;
                 }
+
+                if (choice < 1 || choice > kwFiles.length) {
+                    System.out.println("Invalid choice.");
+                    continue;
+                }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input.");
+                continue;
             }
 
-            // Part B
-            System.out.println("\n=== PRE-PROCESSING (Part B) ===");
-            System.out.println("File               : " + selectedFile.getName());
-            System.out.println("Total tokens       : " + tokenCount);
-            System.out.println("Whitespace removed : " + scanner.getWhitespaceRemoved());
-            System.out.println("Lines processed    : " + scanner.getCurrentLine());
+            File selectedFile = kwFiles[choice - 1];
+            System.out.println("\nReading: " + selectedFile.getName());
+            System.out.println("===========================================");
 
-            // Part E
-            scanner.getSymbolTable().display();
+            try {
+                String input = new String(java.nio.file.Files.readAllBytes(selectedFile.toPath()));
+                ManualScanner scanner = new ManualScanner(input);
+                List<Token> tokens = scanner.scanAll();
 
-            // Part 3
-            scanner.getErrorHandler().displayErrors();
-            scanner.getErrorHandler().displaySummary();
+                // Part A
+                System.out.println("\n=== TOKENS ===");
+                int tokenCount = 0;
+                for (Token token : tokens) {
+                    if (token.getType() != TokenType.WHITESPACE) {
+                        System.out.println(token);
+                        tokenCount++;
+                    }
+                }
 
-        } catch (IOException e) {
-            System.err.println("Error reading file: " + e.getMessage());
+                // Part B
+                System.out.println("\n=== PRE-PROCESSING  ===");
+                System.out.println("File               : " + selectedFile.getName());
+                System.out.println("Total tokens       : " + tokenCount);
+                System.out.println("Whitespace removed : " + scanner.getWhitespaceRemoved());
+                System.out.println("Lines processed    : " + scanner.getCurrentLine());
+
+                // Part E
+                scanner.getSymbolTable().display();
+
+                // Part 3
+                scanner.getErrorHandler().displayErrors();
+                scanner.getErrorHandler().displaySummary();
+
+            } catch (IOException e) {
+                System.err.println("Error reading file: " + e.getMessage());
+            }
         }
+
         userInput.close();
+
     }
 }

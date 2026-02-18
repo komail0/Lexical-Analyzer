@@ -1,14 +1,9 @@
-/* ================================================================
-   SECTION 1: USER CODE
-   ================================================================ */
+
 import java.io.*;
 import java.util.*;
 
 %%
 
-/* ================================================================
-   SECTION 2: OPTIONS & DECLARATIONS
-   ================================================================ */
 %class   Yylex
 %type    Token
 %unicode
@@ -18,21 +13,23 @@ import java.util.*;
 
 %{
     private int          whitespaceRemoved = 0;
+    private int          linesProcessed    = 0;
     private SymbolTable  symbolTable       = new SymbolTable();
     private ErrorHandler errorHandler      = new ErrorHandler();  // Part 3
 
     private Token token(TokenType type) {
+        // Track highest line number seen so far
+        if (yyline + 1 > linesProcessed) linesProcessed = yyline + 1;
         return new Token(type, yytext(), yyline + 1, yycolumn + 1);
     }
 
     public int          getWhitespaceRemoved() { return whitespaceRemoved; }
+    public int          getLinesProcessed()     { return linesProcessed;    }
     public SymbolTable  getSymbolTable()        { return symbolTable;       }
     public ErrorHandler getErrorHandler()       { return errorHandler;      }  // Part 3
 %}
 
-/* ================================================================
-   MACRO DEFINITIONS - EXACT MATCH TO ASSIGNMENT SPECIFICATION
-   ================================================================ */
+
 
 /* 3.1 Keywords: (start|finish|loop|condition|declare|output|input|function|return|break|continue|else) */
 KEYWORD = (start|finish|loop|condition|declare|output|input|function|return|break|continue|else)
@@ -65,9 +62,7 @@ MULTI_COMMENT = "#*"([^*]|\*+[^*#])*"*"+"#"
 /* 3.11 Whitespace: [ \t\r\n]+ */
 WHITESPACE = [ \t\r\n]+
 
-/* ================================================================
-   ERROR DETECTION PATTERNS (Part 3)
-   ================================================================ */
+/* ERROR DETECTION PATTERNS (Part 3)*/
 
 /* Invalid identifier - starts with lowercase */
 INVALID_ID_LOWER = [a-z][a-zA-Z0-9_]*
@@ -93,14 +88,11 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 
 %%
 
-/* ================================================================
-   SECTION 3: LEXICAL RULES
-   Pattern matching priority: first rule wins
-   ================================================================ */
 
-/* ──────────────────────────────────────────────────────────────
-   1. COMMENTS (highest priority)
-   ────────────────────────────────────────────────────────────── */
+
+
+  // 1. COMMENTS (highest priority)
+
 
 {MULTI_COMMENT}       { return token(TokenType.MULTI_LINE_COMMENT);    }
 {SINGLE_COMMENT}      { return token(TokenType.SINGLE_LINE_COMMENT);   }
@@ -111,9 +103,9 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
                         return token(TokenType.ERROR);
                       }
 
-/* ──────────────────────────────────────────────────────────────
-   2. MULTI-CHARACTER OPERATORS (before single-char operators)
-   ────────────────────────────────────────────────────────────── */
+
+  // 2. MULTI-CHARACTER OPERATORS (before single-char operators)
+
 
 /* Arithmetic: ** */
 "**"                  { return token(TokenType.ARITHMETIC_OP);          }
@@ -138,9 +130,7 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 "++"                  { return token(TokenType.INCREMENT_OP);           }
 "--"                  { return token(TokenType.DECREMENT_OP);           }
 
-/* ──────────────────────────────────────────────────────────────
-   3. KEYWORDS (must come BEFORE identifiers)
-   ────────────────────────────────────────────────────────────── */
+//3. KEYWORDS (must come BEFORE identifiers)
 
 "start"               { return token(TokenType.KEYWORD);                }
 "finish"              { return token(TokenType.KEYWORD);                }
@@ -155,18 +145,12 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 "continue"            { return token(TokenType.KEYWORD);                }
 "else"                { return token(TokenType.KEYWORD);                }
 
-/* ──────────────────────────────────────────────────────────────
-   4. BOOLEAN LITERALS (before identifiers)
-   ────────────────────────────────────────────────────────────── */
+//4. BOOLEAN LITERALS (before identifiers)
 
 "true"                { return token(TokenType.BOOLEAN_LITERAL);        }
 "false"               { return token(TokenType.BOOLEAN_LITERAL);        }
 
-/* ──────────────────────────────────────────────────────────────
-   5. NUMERIC LITERALS (before identifiers/error rules so that
-      plain digits are never swallowed by INVALID_ID_* patterns)
-      Float before integer so longest match picks the right rule.
-   ────────────────────────────────────────────────────────────── */
+//NUMERIC LITERALS
 
 /* ERROR: Malformed float - too many fractional digits */
 {FLOAT_MALFORMED}     {
@@ -182,14 +166,10 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 /* Valid integer: [+-]?[0-9]+ */
 {INTEGER}             { return token(TokenType.INTEGER_LITERAL);        }
 
-/* ──────────────────────────────────────────────────────────────
-   6. IDENTIFIERS (with error detection)
-      INVALID_ID_DIGIT is intentionally absent: a token like
-      "2invalid" now tokenises as INTEGER("2") + ERROR("invalid"),
-      matching the manual scanner's behaviour.
-   ────────────────────────────────────────────────────────────── */
+//6. IDENTIFIERS
 
-/* ERROR: Identifier too long (>31 chars) */
+
+// ERROR: Identifier too long (>31 chars)
 {IDENTIFIER_LONG}     {
                         errorHandler.detectIdentifierTooLong(yytext(), yyline+1, yycolumn+1);
                         String truncated = yytext().substring(0, 31);
@@ -197,27 +177,25 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
                         return new Token(TokenType.IDENTIFIER, truncated, yyline+1, yycolumn+1);
                       }
 
-/* ERROR: Invalid identifier - starts with lowercase */
+// ERROR: Invalid identifier - starts with lowercase
 {INVALID_ID_LOWER}    {
                         errorHandler.detectInvalidIdentifier(yytext(), yyline+1, yycolumn+1);
                         return token(TokenType.ERROR);
                       }
 
-/* ERROR: Invalid identifier - starts with underscore */
+// ERROR: Invalid identifier - starts with underscore
 {INVALID_ID_UNDER}    {
                         errorHandler.detectInvalidIdentifier(yytext(), yyline+1, yycolumn+1);
                         return token(TokenType.ERROR);
                       }
 
-/* Valid identifier: [A-Z][a-z0-9_]{0,30} */
+// Valid identifier: [A-Z][a-z0-9_]{0,30}
 {IDENTIFIER}          {
                         symbolTable.insert(yytext(), yyline+1, yycolumn+1);
                         return token(TokenType.IDENTIFIER);
                       }
 
-/* ──────────────────────────────────────────────────────────────
-   7. STRING LITERALS (with error detection)
-   ────────────────────────────────────────────────────────────── */
+//7. STRING LITERALS
 
 /* ERROR: Unterminated string */
 {STRING_UNTERM}       {
@@ -228,9 +206,7 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 /* Valid string: "([ ^"\\\n]|\\["\\ntr])*" */
 {STRING}              { return token(TokenType.STRING_LITERAL);         }
 
-/* ──────────────────────────────────────────────────────────────
-   8. CHARACTER LITERALS
-   ────────────────────────────────────────────────────────────── */
+//8. CHARACTER LITERALS
 
 /* Valid character: '([ ^'\\\n]|\\['\\ntr])' */
 {CHARACTER}           { return token(TokenType.CHARACTER_LITERAL);      }
@@ -241,9 +217,7 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
                         return token(TokenType.ERROR);
                       }
 
-/* ──────────────────────────────────────────────────────────────
-   9. SINGLE-CHARACTER OPERATORS
-   ────────────────────────────────────────────────────────────── */
+//9. SINGLE-CHARACTER OPERATORS
 
 /* Arithmetic: +, -, *, /, % */
 "+"                   { return token(TokenType.ARITHMETIC_OP);          }
@@ -262,9 +236,7 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 /* Assignment: = */
 "="                   { return token(TokenType.ASSIGNMENT_OP);          }
 
-/* ──────────────────────────────────────────────────────────────
-   10. PUNCTUATORS: ( ) { } [ ] , ; :
-   ────────────────────────────────────────────────────────────── */
+// 10. PUNCTUATORS: ( ) { } [ ] , ; :
 
 "("                   { return token(TokenType.PUNCTUATOR);             }
 ")"                   { return token(TokenType.PUNCTUATOR);             }
@@ -276,18 +248,15 @@ MULTI_UNCLOSED = "#*"([^*]|\*+[^*#])*
 ";"                   { return token(TokenType.PUNCTUATOR);             }
 ":"                   { return token(TokenType.PUNCTUATOR);             }
 
-/* ──────────────────────────────────────────────────────────────
-   11. WHITESPACE: [ \t\r\n]+
-   ────────────────────────────────────────────────────────────── */
+//11. WHITESPACE: [ \t\r\n]+
 
 {WHITESPACE}          {
                         whitespaceRemoved += yytext().length();
+                        if (yyline + 1 > linesProcessed) linesProcessed = yyline + 1;
                         return token(TokenType.WHITESPACE);
                       }
 
-/* ──────────────────────────────────────────────────────────────
-   12. ERROR: Invalid character (catch-all)
-   ────────────────────────────────────────────────────────────── */
+//12. ERROR: Invalid character (catch-all)
 
 [^]                   {
                         errorHandler.detectInvalidChar(yytext().charAt(0), yyline+1, yycolumn+1);
