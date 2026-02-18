@@ -1,5 +1,5 @@
 # KW Language - Lexical Analyzer
-## CS4031 Compiler Construction | Assignment 01
+## CS4031 Compiler Construction | Assignment 01 
 
 ---
 
